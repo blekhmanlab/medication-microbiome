@@ -17,7 +17,7 @@ Medications exert strong effects on the gut microbiome, impacting host physiolog
 
 ### Description
 
-This page contains code to run the models and generate the figures in this paper. Code and selected de-identified data files are available on Zenodo. 
+This page contains code to run the models and generate the figures in this paper. Code, output files, and selected de-identified data files are available on Zenodo. 
 To generate the figures, run:
 `./build_figures.py`
 
