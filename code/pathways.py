@@ -100,8 +100,38 @@ def load_pathway_hierarchy(table_pathways, table_results):
   #
   # Metabolite Pathway Enrichment Analysis:
   #
+
+# pathways.pathway_to_pathway_general
+# pathways.metabolite_to_pathway
+# pathways.table_metab_pathways
+# pathways.metabs_positive
+# pathways.metabs_negative
+# pathways.include_pathways
+# pathways.pathways_positive
+# pathways.pathways_negative
+
+# pathways.metabolite_processes
+# pathways.metabolites_lu
+
+# pathways.table_metab_pathways
+
+
+# df = pathways.metabolite_to_pathway.pathways.map(lambda xs: "".join(xs))
+# cs = np.concatenate(pathways.metabolite_to_pathway.pathways.map(lambda xs: "".join(xs)).values).unique()
+
+# pathways.pathway_to_pathway_general.to_parquet("code/data/pathways/pathway_to_pathway_general.parquet")
+# df = pathways.metabolite_to_pathway.copy()
+# df.pathways = df.pathways.map(lambda xs: ";".join(xs))
+# df.to_parquet("code/data/pathways/metabolite_to_pathway.parquet")
+# pd.DataFrame(pathways.table_metab_pathways.map(lambda xs: ";".join(xs))).to_parquet("code/data/pathways/table_metab_pathways.parquet")
+# pd.DataFrame(pathways.metabs_positive,columns=["metabs"]).to_parquet("code/data/pathways/metabs_positive.parquet")
+# pd.DataFrame(pathways.metabs_negative,columns=["metabs"]).to_parquet("code/data/pathways/metabs_negative.parquet")
+# pd.DataFrame(pathways.include_pathways,columns=["pathway"]).to_parquet("code/data/pathways/include_pathways.parquet")
+# pd.DataFrame(pathways.pathways_positive,columns=["pathways"]).to_parquet("code/data/pathways/pathways_positive.parquet")
+# pd.DataFrame(pathways.pathways_negative,columns=["pathways"]).to_parquet("code/data/pathways/pathways_negative.parquet")
+# pathways.results_enrichment_medication_metabolites.to_parquet("code/data/pathways/results_enrichment_medication_metabolites.parquet")
+
 def load_metabolites(table_pathways, table_results, table_metab):
-  global pathway_to_pathway_general, metabolite_processes, metabolites_lu, metabolite_to_pathway, table_metab_pathways, table_metab_pathways, metabs_positive, metabs_negative, include_pathways, pathways_positive, pathways_negative, results_enrichment_medication_metabolites
   print("loading metabolites tree")
   tree = ET.parse('data/hmdb_metabolites.xml')
   # Pathways
@@ -175,6 +205,30 @@ def load_metabolites(table_pathways, table_results, table_metab):
   table_metab_pathways = pd.Series(table_metab.index).replace(synonyms).apply(lambda row: np.concatenate([np.array([],dtype=str), metabolite_to_pathway["pathways"].loc[row]]).tolist() if row in metabolite_to_pathway.index else "").apply(flatten)
   table_metab_pathways.index = table_metab.index
   table_metab_pathways = table_metab_pathways.loc[~table_metab_pathways.index.duplicated(keep="first")]
+  pathway_to_pathway_general.to_parquet("code/data/pathways/pathway_to_pathway_general.parquet")
+  df = metabolite_to_pathway.copy()
+  df.pathways = df.pathways.map(lambda xs: ";".join(xs))
+  df.to_parquet("code/data/pathways/metabolite_to_pathway.parquet")
+  pd.DataFrame(table_metab_pathways.map(lambda xs: ";".join(xs))).to_parquet("code/data/pathways/table_metab_pathways.parquet")
+  pd.DataFrame(metabs_positive,columns=["metabs"]).to_parquet("code/data/pathways/metabs_positive.parquet")
+  pd.DataFrame(metabs_negative,columns=["metabs"]).to_parquet("code/data/pathways/metabs_negative.parquet")
+  pd.DataFrame(include_pathways,columns=["pathway"]).to_parquet("code/data/pathways/include_pathways.parquet")
+  pd.DataFrame(pathways_positive,columns=["pathways"]).to_parquet("code/data/pathways/pathways_positive.parquet")
+  pd.DataFrame(pathways_negative,columns=["pathways"]).to_parquet("code/data/pathways/pathways_negative.parquet")
+  results_enrichment_medication_metabolites.to_parquet("code/data/pathways/results_enrichment_medication_metabolites.parquet")
+
+def load_saved():
+  global pathway_to_pathway_general, metabolite_processes, metabolites_lu, metabolite_to_pathway, table_metab_pathways, table_metab_pathways, metabs_positive, metabs_negative, include_pathways, pathways_positive, pathways_negative, results_enrichment_medication_metabolites
+  pathway_to_pathway_general = pd.read_parquet("data/pathways/pathway_to_pathway_general.parquet")
+  metabolite_to_pathway = pd.read_parquet("data/pathways/metabolite_to_pathway.parquet")
+  metabolite_to_pathway.pathways = metabolite_to_pathway.apply(lambda xs: xs.str.split(";"))
+  table_metab_pathways = pd.read_parquet("data/pathways/table_metab_pathways.parquet")["compound"].str.split(";")
+  metabs_positive = pd.read_parquet("data/pathways/metabs_positive.parquet")["metabs"]
+  metabs_negative = pd.read_parquet("data/pathways/metabs_negative.parquet")["metabs"]
+  include_pathways = pd.read_parquet("data/pathways/include_pathways.parquet")["pathway"]
+  pathways_positive = pd.read_parquet("data/pathways/pathways_positive.parquet")["pathways"]
+  pathways_negative = pd.read_parquet("data/pathways/pathways_negative.parquet")["pathways"]
+  results_enrichment_medication_metabolites = pd.read_parquet("data/pathways/results_enrichment_medication_metabolites.parquet")
 
 
 def pathway_enrichment(table_pathways, table_results, table_metab):

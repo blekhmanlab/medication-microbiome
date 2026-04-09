@@ -975,8 +975,65 @@ def run_models(modeldir="data/metab_associations_10_20_30_quant"):
   save_simple_associations(all_results_startmed, results_stderror, lm_convergence, Xs, Ys, Ys_before, Ys_after, collection_lengths, tables_medication_started_decor, modeldir)
   print("done.")
 
+# export intermediate data files
+if True:
+  table_microbes.to_parquet("code/data/table_microbes.parquet")
+  table_microbes_clr.to_parquet("code/data/table_microbes_clr.parquet")
+  remap_mrn_column(samples[["mrn", "shotgunSeq_id", "metabolomicsID", "db", "date_collected"]]).to_parquet("code/data/samples.parquet")
+  remap_mrn_index(table_demographics[["sex","birth_date"]]).to_parquet("code/data/table_demographics.parquet")
+  df = remap_mrn_column(hospital_visits).copy()
+  df["labs_ix"] = df["labs_ix"].apply(lambda x: str(x))
+  df = df.apply(lambda col: col if col.dtype!="obj" else col.map(lambda xs: ";".join(np.array(xs).astype(str))))
+  df.to_parquet("code/data/hospital_visits.parquet")
+  study_intervals.to_parquet("code/data/study_intervals.parquet")
+  pd.DataFrame([min_date.strftime('%Y-%m-%d')],columns=["date"]).to_parquet("code/data/min_date.parquet")
+  pd.DataFrame(medications,columns=["medication"]).to_parquet("code/data/medications.parquet")
+  pd.DataFrame(durations,columns=["low","high"]).to_parquet("code/data/durations.parquet")
+  medications_started_dose.to_parquet("code/data/medications_started_dose.parquet")
+  medications_started_starttime.to_parquet("code/data/medications_started_starttime.parquet")
+  table_microbes_relabund.to_parquet("code/data/table_microbes_relabund.parquet")
+  df = table_pathways.copy()
+  df.columns = df.columns.map(lambda x: str(x))
+  df.to_parquet("code/data/table_pathways.parquet")
+  table_genus_metab_correl.to_parquet("code/data/table_genus_metab_correl.parquet")
+  matrix_genus.to_parquet("code/data/matrix_genus.parquet")
+  matrix_metab.to_parquet("code/data/matrix_metab.parquet")
+  table_invitro_reference.to_parquet("code/data/table_invitro_reference.parquet")
+  correspondences.to_parquet("code/data/correspondences.parquet")
+  df = table_pathways_general.copy()
+  df.columns = df.columns.map(lambda x: str(x))
+  df.to_parquet("code/data/table_pathways_general.parquet")
+  pd.DataFrame(meds2[["harmonized_generic_route","med_pharm_class","med_pharm_sub_class"]].drop_duplicates("harmonized_generic_route").set_index("harmonized_generic_route")).to_parquet("code/data/medication_classes.parquet")
+  pd.DataFrame(meds2.drop_duplicates(["take_med_int","harmonized_generic_route"]).groupby("harmonized_generic_route").size(),columns=["count"]).to_parquet("code/data/medication_counts.parquet")
+  pd.DataFrame(meds2.drop_duplicates(["take_med_int","pharm_class"]).groupby("pharm_class").size(),columns=["count"]).to_parquet("code/data/medication_class_counts.parquet")
+
+if True:
+  paperfigures.table_microbes = pd.read_parquet("data/table_microbes.parquet")
+  paperfigures.table_microbes_clr = pd.read_parquet("data/table_microbes_clr.parquet")
+  paperfigures.samples = pd.read_parquet("data/samples.parquet")
+  paperfigures.table_demographics = pd.read_parquet("data/table_demographics.parquet")
+  paperfigures.hospital_visits = pd.read_parquet("data/hospital_visits.parquet")
+  paperfigures.study_intervals = pd.read_parquet("data/study_intervals.parquet")
+  paperfigures.min_date = datetime.strptime(pd.read_parquet("data/min_date.parquet"), "%Y-%m-%d")
+  paperfigures.medications = pd.read_parquet("data/medications.parquet")["medication"].values
+  paperfigures.durations = pd.read_parquet("data/durations.parquet")
+  paperfigures.medications_started_dose = pd.read_parquet("data/medications_started_dose.parquet")
+  paperfigures.medications_started_starttime = pd.read_parquet("data/medications_started_starttime.parquet")
+  paperfigures.table_microbes_relabund = pd.read_parquet("data/table_microbes_relabund.parquet")
+  paperfigures.table_pathways = pd.read_parquet("data/table_pathways.parquet")
+  paperfigures.table_genus_metab_correl = pd.read_parquet("data/table_genus_metab_correl.parquet")
+  paperfigures.matrix_genus = pd.read_parquet("data/matrix_genus.parquet")
+  paperfigures.matrix_metab = pd.read_parquet("data/matrix_metab.parquet")
+  paperfigures.table_invitro_reference = pd.read_parquet("data/table_invitro_reference.parquet")
+  paperfigures.correspondences = pd.read_parquet("data/correspondences.parquet")
+  paperfigures.table_pathways_general = pd.read_parquet("data/table_pathways_general.parquet")
+  paperfigures.medication_classes = pd.read_parquet("data/medication_classes.parquet")
+  paperfigures.medication_counts = pd.read_parquet("data/medication_counts.parquet")
+  paperfigures.medication_class_counts = pd.read_parquet("data/medication_class_counts.parquet")
+
 def update_figures():
   importlib.reload(paperfigures)
+  paperfigures.make_figures()
   paperfigures.table_microbes = table_microbes
   paperfigures.table_microbes_clr = table_microbes_clr
   paperfigures.samples = samples
@@ -1058,4 +1115,18 @@ def compute_estimates_return_to_baseline():
   return time_return_baseline
 
 if __name__ == "__main__":
+  pdb.set_trace()
   run_models()
+
+
+
+
+
+
+
+
+
+
+
+
+

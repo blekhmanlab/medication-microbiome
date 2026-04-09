@@ -44,7 +44,12 @@ import reportlab.pdfbase.ttfonts
 import reportlab.pdfgen.canvas
 from sklearn.preprocessing import MultiLabelBinarizer
 import pdf2image
+import pathways
 
+from util import *
+
+
+durations = [(2, 10), (10, 20), (20, 30)]
 # initialize fonts
 font_variants = ("Arial","Arial Italic","Arial Bold")
 folder = '/System/Library/Fonts/Supplemental/'
@@ -273,7 +278,10 @@ def make_figure_1b():
   demo_birthdate = demo_mrn.apply(lambda mrn: table_demographics.loc[mrn]["birth_date"].split(" ")[0] if mrn in table_demographics.index else None)
   demo_birthyear = demo_birthdate.str.split("-").str[0]
   demographics = pd.concat([demo_mrn.rename("mrn"), demo_sex.rename("sex"), demo_samples.rename("samples"), demo_birthyear.rename("birthyear")], axis=1)
-  demographics["age"] = demographics.apply(lambda row: float(str(row.samples.iloc[0].date_collected).split("-")[0]) - float(np.nan if row.birthyear is None else row.birthyear) if len(row.samples)>0 else None, axis=1)
+  age2 = demographics.apply(lambda row: (str(row.samples.iloc[0].date_collected).split("-")[0]) if len(row.samples)>0 else None, axis=1).apply(lambda x: np.nan if x=="None" else x).astype(float)
+  age1 = demographics.apply(lambda row: float(np.nan if row.birthyear is None else row.birthyear) if len(row.samples)>0 else None, axis=1)
+  demographics["age"] = age2-age1
+  # demographics["age"] = demographics.apply(lambda row: float(str(row.samples.iloc[0].date_collected).split("-")[0]) - float(np.nan if row.birthyear is None else row.birthyear) if len(row.samples)>0 else None, axis=1)
   demographics["cohorts"] = demographics["samples"].apply(lambda df: " ".join([str(x) for x in np.sort(np.unique(df["db"]))]))
   # days hospitalized
   collection_to_visit = hospital_visits.copy()
@@ -415,7 +423,7 @@ def make_figure_1c():
   axes[0].set_xlabel('Year', fontsize=8)
   axes[0].set_ylabel('Patient', fontsize=8)
   # axes[0].set_xticks(np.linspace(encs[encs['adm_date_int']!=encs['disc_date_int']]['adm_date_int'].min(), encs[encs['adm_date_int']!=encs['disc_date_int']]['disc_date_int'].max(), 5).astype('int'))
-  ax_date1 = datetime.datetime((min_date + datetime.timedelta(days=study_intervals["date_collection1"].min()-1)).year, 1, 1)
+  ax_date1 = datetime.datetime((min_date + datetime.timedelta(days=study_intervals["date_collection1"].min()-1)).year, 1, 1)    ## ERROR HERE
   ax_date2 = datetime.datetime((min_date + datetime.timedelta(days=int(study_intervals['discharged'].max())-1)).year+1, 1, 1)
   tick_dates = [ax_date1.replace(year=ax_date1.year+yi) for yi in range((ax_date2.year+1) - ax_date1.year)]
   axes[0].set_xlim((tick_dates[0] - min_date).days, (tick_dates[1] - min_date).days)
@@ -432,7 +440,7 @@ def make_figure_1c():
   fig.savefig("out/figure_1c.pdf")
 
 def make_figure_1d():
-  top_medications = meds2.drop_duplicates(["take_med_int","harmonized_generic_route"]).groupby("harmonized_generic_route").size().loc[medications].sort_values(ascending=False).head(20)
+  top_medications = medication_counts.loc[medications]["count"].sort_values(ascending=False).head(20)
   fig = plt.figure(figsize=(2.5,3.10))
   spec = gridspec.GridSpec(figure=fig, ncols=1, nrows=1, left=0.47, bottom=0.2, right=0.90, top=0.92)
   ax = fig.add_subplot(spec[0])
@@ -503,11 +511,12 @@ def make_figure_1e():
 
 def make_figure_2a():
   figure_normalize = "effectsize"
-  medication_counts = meds2.drop_duplicates(["take_med_int","harmonized_generic_route"]).groupby("harmonized_generic_route").size().loc[medications].sort_values(ascending=False)
+  df_medication_counts = medication_counts["count"].loc[medications].sort_values(ascending=False)
+  # medication_counts = meds2.drop_duplicates(["take_med_int","harmonized_generic_route"]).groupby("harmonized_generic_route").size().loc[medications].sort_values(ascending=False)
   # medication_counts = medications_started_dose.sum()
-  for key in set(results.table.medication.unique()) - set(medication_counts.index):
+  for key in set(results.table.medication.unique()) - set(df_medication_counts.index):
     keymeds = key.split("|")
-    medication_counts.loc[key] = medication_counts.loc[keymeds].sum()
+    df_medication_counts.loc[key] = df_medication_counts.loc[keymeds].sum()
   # medication_counts = meds2.drop_duplicates(["take_med_int","harmonized_generic_route"]).groupby("harmonized_generic_route").size().loc[medications].sort_values(ascending=False)
   figure_dims = (7.5,3.25)
   fig = plt.figure(figsize=figure_dims)
@@ -523,7 +532,7 @@ def make_figure_2a():
         aggregated = results.table[(results.table.significant) & (results.table.modeltype=="binary")][["medication","sampletype","duration"]].value_counts()
         # medication_counts = medications_started_dose.sum()
         # medication_counts = meds2.drop_duplicates(["take_med_int","harmonized_generic_route"]).groupby("harmonized_generic_route").size().loc[medications].sort_values(ascending=False)
-        aggregated = aggregated.div(medication_counts.loc[aggregated.index.get_level_values("medication")].values)
+        aggregated = aggregated.div(df_medication_counts.loc[aggregated.index.get_level_values("medication")].values)
       elif figure_normalize == "effectsize":
         aggregated = results.table[(results.table.significant) & (results.table.modeltype=="binary")][["medication","sampletype","duration","coef"]].groupby(["medication","sampletype","duration"]).apply(lambda xs: xs.abs().mean())
       elif figure_normalize == "pvalue":
@@ -536,7 +545,8 @@ def make_figure_2a():
     elif level=="medication_pharm_class":
       if figure_normalize == "count":
         aggregated = results.table[(results.table.significant) & (results.table.modeltype=="binary")].explode("medication_pharm_class")[["medication_pharm_class","sampletype","duration"]].value_counts()
-        medication_class_counts = meds2.drop_duplicates(["take_med_int","pharm_class"]).groupby("pharm_class").size().loc[aggregated.index.get_level_values("medication_pharm_class")]
+        # medication_class_counts = meds2.drop_duplicates(["take_med_int","pharm_class"]).groupby("pharm_class").size().loc[aggregated.index.get_level_values("medication_pharm_class")]
+        medication_class_counts = medication_class_counts["count"].loc[aggregated.index.get_level_values("medication_pharm_class")]
         aggregated = aggregated.div(medication_class_counts.values)
       elif figure_normalize == "effectsize":
         aggregated = results.table[(results.table.significant) & (results.table.modeltype=="binary")].explode("medication_pharm_class")[["medication_pharm_class","sampletype","duration","coef"]].groupby(["medication_pharm_class","sampletype","duration"]).apply(lambda xs: xs.abs().mean())
@@ -743,7 +753,7 @@ def make_figure_2d():
   grid = grid.loc[(grid!=0).sum(axis=1)>0, (grid!=0).sum(axis=0)>1]
   grid.columns = grid.columns.get_level_values(0)
   # grid = grid.loc[((grid!=0).sum(axis=1)>5),((grid!=0).sum(axis=0)>7)]
-  grid_classes = medication_classes = meds2[["harmonized_generic_route","med_pharm_class","med_pharm_sub_class"]].drop_duplicates("harmonized_generic_route").set_index("harmonized_generic_route").loc[grid.index.str.split("|").str[0]].reset_index()
+  grid_classes = medication_classes.loc[grid.index.str.split("|").str[0]].reset_index()
   # grid_classes_ix_medname = grid_classes.set_index("index")
   # ordering_X = scipy.cluster.hierarchy.dendrogram(scipy.cluster.hierarchy.linkage(grid), no_plot=True, color_threshold=-np.inf)['leaves']
   ordering_meds = grid_classes.sort_values("med_pharm_class").index
@@ -1934,7 +1944,7 @@ def make_figure(filename, figures):
     arrange_figure_on_page(blank_page, figure[0], figure[1], figure[2])
   with open(filename, "wb") as fp:
     writer.write(fp)
-
+ 
 def add_labels(filename, labels):
   packet = io.BytesIO()
   can = reportlab.pdfgen.canvas.Canvas(packet, pagesize=reportlab.lib.pagesizes.letter)
@@ -1970,19 +1980,17 @@ def place_figures():
   make_figure("out/figure_4.pdf", [["out/figure_4a.pdf", 0, 4.5], ["out/figure_4b.pdf", 0, 2], ["out/figure_4c.pdf", 3.75, 2], ["out/figure_4d.pdf", 0, 0], ["out/figure_4e.pdf", 4, 0]])
   add_labels("out/figure_4.pdf", [["a.", 0.1 * 72,9.85 * 72],["b.", 0.1 * 72,5.35 * 72],["c.", 3.85 * 72,5.35 * 72],["d.", 0.1 * 72,1.8 * 72],["e.", 3.85 * 72,1.8 * 72]])
 
+poppler_path = r"/usr/bin"    ## UPDATE THIS TO YOUR POPPLER INSTALL DIRECTORY
+
 def convert_to_png():
   for n in [1,2,3,4]:
-    pages = pdf2image.convert_from_path("out/figure_%d.pdf"%n, 500, poppler_path=r"/usr/bin")
+    pages = pdf2image.convert_from_path("out/figure_%d.pdf"%n, 500, poppler_path=poppler_path)
     for count, page in enumerate(pages):
       page.save(f'out/figure_%d.png'%n, 'PNG')
 
 def make_figures():
   make_figure_panels()
   place_figures()
-  convert_to_png()
-
-
-
-
+  # convert_to_png()
 
 
